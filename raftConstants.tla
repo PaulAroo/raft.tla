@@ -5,6 +5,9 @@ EXTENDS Naturals, FiniteSets, Sequences, TLC
 \* The set of server IDs
 CONSTANTS Server
 
+\* << NEW >> The Switch entity
+CONSTANTS Switch
+
 \* The set of client requests that can go into the log
 CONSTANTS Value
 
