@@ -21,7 +21,13 @@ VARIABLE maxc
 \*   committed |-> Bool ] \* Flag indicating if the entry is committed
 VARIABLE entryCommitStats
 
-instrumentationVars == <<leaderCount, maxc, entryCommitStats>>
+\* << NEW >> Log maintained by the Switch
+VARIABLE switchLog
+
+\* << NEW >> Cache for followers to store unordered data from Switch
+VARIABLE serverCache
+
+instrumentationVars == <<leaderCount, maxc, entryCommitStats, switchLog, serverCache>>
 
 \* The following variables are all per server (functions with domain Server).
 

@@ -1,5 +1,8 @@
 
-## 07 / 04 / 2025
+## Notes on Project progress
+
+### 07 / 04 / 2025
+------------------
 
 Understanding the requirements of the first exercise
 
@@ -12,4 +15,11 @@ Understanding the requirements of the first exercise
 
 - Servers (both leaders and followers) have a cache (to store the entries received from switch)
 
-the leader also sends the client request to followers (just metadata), the follower check that that request exists in the followers cache unordered, if it exist, respond to leader otherwise failed
+- The leader also sends the client request to followers (just metadata), the follower check that that request exists in the followers cache unordered, if it exist, respond to leader otherwise failed
+
+### 09 / 04 / 2025
+------------------
+
+First steps towards implementation
+- Add an action for switch to handle (accept and log) client request
+- Update variables and state transition formulas to match (MyInit, MyNext)
