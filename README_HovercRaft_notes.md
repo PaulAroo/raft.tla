@@ -23,3 +23,6 @@ Understanding the requirements of the first exercise
 First steps towards implementation
 - Add an action for switch to handle (accept and log) client request
 - Update variables and state transition formulas to match (MyInit, MyNext)
+- unanswered questions:
+  - allow logging the same value v again just because the leader's term changed?
+  - how do I keep track of the index to the switch's log, in order to determine what needs to be sent next (adding a combined action where a switch adds entry to it's log and sends should solve this problem?)

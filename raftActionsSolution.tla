@@ -124,19 +124,17 @@ DropStaleResponse(i, j, m) ==
 
 \***************************** AppendEntries **********************************************
 
-SwitchAcceptAndLogRequest(v) ==
+SwitchAcceptAndLogRequest(leader, v) ==
     /\ maxc < MaxClientRequests
-    /\ LET entryExists == \E index \in DOMAIN switchLog : switchLog[index] = v
+    /\ LET entryTerm == currentTerm[leader]
+           entry == [term |-> entryTerm, value |-> v, payload |-> v]
+           entryExists == \E index \in DOMAIN switchLog : switchLog[index].value = v /\ switchLog[index].payload = v /\ switchLog[index].term = entryTerm
+          \*  newLog == IF entryExists THEN switchLog ELSE Append(switchLog, entry)
        IN
-         \* Only proceed if the entry is new
-         /\ IF ~entryExists THEN
-                /\ switchLog' = Append(switchLog, v)
-                /\ maxc' = maxc + 1
-            ELSE \* If entry already exists, do nothing to log or counter
-                /\ UNCHANGED <<switchLog, maxc>>
+        /\ switchLog' = IF entryExists THEN switchLog ELSE Append(switchLog, entry)
+        /\ maxc' = IF entryExists THEN maxc ELSE maxc + 1
 
-         \* This action ONLY affects switchLog and maxc. Messages are handled separately.
-         /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, serverCache>>
+    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, serverCache>>
 
 \* Modified. Leader i receives a client request to add v to the log. up to MaxClientRequests.
 ClientRequest(i, v) ==
