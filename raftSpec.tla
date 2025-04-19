@@ -27,6 +27,10 @@ Receive(m) ==
           /\ \/ DropStaleResponse(i, j, m)
              \/ HandleAppendEntriesResponse(i, j, m)
 
+        \* --- New HoverCraft Handler ---
+       \/ /\ m.mtype = AppendSwitchEntriesRequest
+          /\ HandleSwitchDataForward(i, m)
+
 \* Defines how the variables may transition.
 Next == 
            \/ \E i \in Server : Timeout(i)
@@ -53,11 +57,13 @@ MyNext ==
            \/ \E i \in Server : AdvanceCommitIndex(i)
            \/ \E i,j \in Server : i /= j /\ AppendEntries(i, j)
            \/ \E m \in {msg \in ValidMessage(messages) : \* to visualize possible messages
-                    msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse}} : Receive(m)
+                    msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse, AppendSwitchEntriesRequest}} : Receive(m)
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
 \*                    msg.mtype \in {AppendEntriesRequest}} : DuplicateMessage(m)
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
 \*                    msg.mtype \in {RequestVoteRequest}} : DropMessage(m)
+        \* NEW Trigger structure for Switch sending data INDIVIDUALLY
+            \/ \E s \in Server : SwitchAppendEntries(s)  \* Action sends data FROM Switch TO server 's'
 
 
 \* The specification must start with the initial state and transition according

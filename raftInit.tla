@@ -48,6 +48,7 @@ MyInit ==
     /\ entryCommitStats = [ idx_term \in {} |-> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ] ] \* Initialize here too
     /\ switchLog = << >>  \* << NEW >> Initialize Switch log
     /\ serverCache = [s \in Server |-> {}] \* << NEW >> Initialize follower cache
+    /\ switchNextIndex = [s \in Server |-> 1] \* << NEW >>
 
 \* to be used directly in model Init the value
 \*MyInit2 ==

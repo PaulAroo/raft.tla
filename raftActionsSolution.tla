@@ -194,6 +194,41 @@ AppendEntries(i, j) ==
             ELSE entryCommitStats         
     /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, maxc, leaderCount>>
 
+
+\* WIP Action: Switch attempts to send the next log entry to a specific server 's'.
+SwitchAppendEntries(s) ==
+    /\ Len(switchLog) > 0  \* Only proceed if the leader has entries to send
+    \* /\ switchNextIndex[s] <= Len(switchLog)
+    /\ LET nextLogIdxToSend == switchNextIndex[s] \* Index in switchLog to send to server 's'
+           entry == switchLog[nextLogIdxToSend]
+           entries == << entry >>
+
+      IN Send([mtype          |-> AppendSwitchEntriesRequest,
+               mentries       |-> entries,
+               msource        |-> Switch,
+               mterm          |-> entry.term
+               mdest          |-> s])
+
+
+       /\ switchNextIndex' = [switchNextIndex EXCEPT ![s] = @ + 1]
+    /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, maxc, leaderCount, serverCache, switchLog >>
+
+\* Server s receives an AppendEntries request from the Switch
+HandleAppendSwitchEntryRequest(s, m) ==
+    \/ /\ m.mterm < currentTerm[s]  \* Stale message from a previous term
+       \* Ignore stale messages, just discard them.
+       /\ Discard(m)
+       /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, switchLog, switchNextIndex, maxc, serverCache>>
+
+    \/ /\ m.mterm = currentTerm[s]
+       /\ LET receivedEntry == m.entries[1]
+          IN
+             /\ serverCache' = Append(serverCache, receivedEntry)
+            \*  /\ Discard(m)
+
+       \* State unchanged except for serverCache and messages (handled by Discard)
+       /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, switchLog, switchNextIndex, maxc>>
+
 \* Server i receives an AppendEntries request from server j with
 \* m.mterm <= currentTerm[i]. This just handles m.entries of length 0 or 1, but
 \* implementations could safely accept more by treating them the same as

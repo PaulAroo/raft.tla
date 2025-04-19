@@ -18,7 +18,7 @@ Understanding the requirements of the first exercise
 - The leader also sends the client request to followers (just metadata), the follower check that that request exists in the followers cache unordered, if it exist, respond to leader otherwise failed
 
 ### 09 / 04 / 2025
-------------------
+-------------------
 
 First steps towards implementation
 - Add an action for switch to handle (accept and log) client request
@@ -26,3 +26,17 @@ First steps towards implementation
 - unanswered questions:
   - allow logging the same value v again just because the leader's term changed?
   - how do I keep track of the index to the switch's log, in order to determine what needs to be sent next (adding a combined action where a switch adds entry to it's log and sends should solve this problem?)
+
+### 19 / 04 / 2025
+-------------------
+
+- Added VARIABLE `switchNextIndex`: A function mapping each Server s to the next index in switchLog that the Switch needs to send to that specific server.
+- Added a new message type `AppendSwitchEntriesRequest`
+- Created action `SwitchAppendEntries(s)`:
+  - Triggered in `MyNext` for a specific target server `s`
+  - Uses `switchNextIndex[s]` to determine the entry index to send from `switchLog`.
+  - Constructs a `AppendSwitchEntriesRequest` message containing the term, value, and payload.
+  - Optimistically increments `switchNextIndex[s]`
+- Created handler action `HandleAppendSwitchEntryRequest`
+  - primarily updates server cache with entry
+- Updated the explicit set of message types handled by the Receive trigger in MyNext to include AppendSwitchEntriesRequest
