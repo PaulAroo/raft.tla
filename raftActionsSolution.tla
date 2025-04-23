@@ -197,7 +197,7 @@ AppendEntries(i, j) ==
 
 \* WIP Action: Switch attempts to send the next log entry to a specific server 's'.
 SwitchAppendEntries(s) ==
-    /\ Len(switchLog) > 0  \* Only proceed if the leader has entries to send
+    /\ Len(switchLog) > 0  \* Only proceed if the switch has entries to send
     \* /\ switchNextIndex[s] <= Len(switchLog)
     /\ LET nextLogIdxToSend == switchNextIndex[s] \* Index in switchLog to send to server 's'
            entry == switchLog[nextLogIdxToSend]
@@ -224,7 +224,7 @@ HandleAppendSwitchEntryRequest(s, m) ==
        /\ LET receivedEntry == m.entries[1]
           IN
              /\ serverCache' = Append(serverCache, receivedEntry)
-            \*  /\ Discard(m)
+             /\ Discard(m)
 
        \* State unchanged except for serverCache and messages (handled by Discard)
        /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, switchLog, switchNextIndex, maxc>>

@@ -29,7 +29,7 @@ Receive(m) ==
 
         \* --- New HoverCraft Handler ---
        \/ /\ m.mtype = AppendSwitchEntriesRequest
-          /\ HandleSwitchDataForward(i, m)
+          /\ HandleAppendSwitchEntryRequest(i, m)
 
 \* Defines how the variables may transition.
 Next == 
