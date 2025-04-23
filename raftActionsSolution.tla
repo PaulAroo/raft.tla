@@ -123,19 +123,6 @@ DropStaleResponse(i, j, m) ==
     /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, instrumentationVars>>
 
 \***************************** AppendEntries **********************************************
-
-SwitchAcceptAndLogRequest(leader, v) ==
-    /\ maxc < MaxClientRequests
-    /\ LET entryTerm == currentTerm[leader]
-           entry == [term |-> entryTerm, value |-> v, payload |-> v]
-           entryExists == \E index \in DOMAIN switchLog : switchLog[index].value = v /\ switchLog[index].payload = v /\ switchLog[index].term = entryTerm
-          \*  newLog == IF entryExists THEN switchLog ELSE Append(switchLog, entry)
-       IN
-        /\ switchLog' = IF entryExists THEN switchLog ELSE Append(switchLog, entry)
-        /\ maxc' = IF entryExists THEN maxc ELSE maxc + 1
-
-    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, serverCache>>
-
 \* Modified. Leader i receives a client request to add v to the log. up to MaxClientRequests.
 ClientRequest(i, v) ==
     /\ state[i] = Leader
@@ -194,11 +181,61 @@ AppendEntries(i, j) ==
             ELSE entryCommitStats         
     /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, maxc, leaderCount>>
 
+\* Modified HoverCraft AppendEntries
+AppendMetaDataEntries(i, j) ==
+    /\ i /= j
+    /\ state[i] = Leader
+    /\ Len(log[i]) > 0  \* Only proceed if the leader has entries to send
+    /\ nextIndex[i][j] <= Len(log[i])
+    /\ LET entryIndex == nextIndex[i][j]
+           leaderLogEntry == log[i][entryIndex] \* Get the full entry from leader's log
 
-\* WIP Action: Switch attempts to send the next log entry to a specific server 's'.
+           \* <<< THE CRUCIAL CHANGE >>>
+           \* Explicitly create a *new* record with ONLY metadata
+           metadataEntry == [term |-> leaderLogEntry.term,
+                             value |-> leaderLogEntry.value]
+           \* Put the metadata-only record into the sequence
+           entriesToSend == << metadataEntry >>
+
+           prevLogIndex == entryIndex - 1
+           prevLogTerm == IF prevLogIndex > 0 THEN log[i][prevLogIndex].term ELSE 0
+           entryKey == <<entryIndex, leaderLogEntry.term>>
+       IN
+         \* Send the message with mentries containing only the metadata record
+         /\ Send([mtype          |-> AppendEntriesRequest,
+                  mterm          |-> currentTerm[i],
+                  mprevLogIndex  |-> prevLogIndex,
+                  mprevLogTerm   |-> prevLogTerm,
+                  mentries       |-> entriesToSend,  \* << Now contains metadata only
+                  mcommitIndex   |-> Min({commitIndex[i], prevLogIndex}),
+                  msource        |-> i,
+                  mdest          |-> j])
+
+         /\ entryCommitStats' =
+            IF entryKey \in DOMAIN entryCommitStats /\ ~entryCommitStats[entryKey].committed
+            THEN [entryCommitStats EXCEPT ![entryKey].sentCount = @ + 1]
+            ELSE entryCommitStats
+
+    /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, maxc, leaderCount,
+                     switchLog, switchNextIndex, serverCache>>
+
+SwitchAcceptAndLogRequest(leader, v) ==
+    /\ maxc < MaxClientRequests
+    /\ LET entryTerm == currentTerm[leader]
+           entry == [term |-> entryTerm, value |-> v, payload |-> v]
+           entryExists == \E index \in DOMAIN switchLog : switchLog[index].value = v /\ switchLog[index].payload = v /\ switchLog[index].term = entryTerm
+          \*  newLog == IF entryExists THEN switchLog ELSE Append(switchLog, entry)
+       IN
+        /\ switchLog' = IF entryExists THEN switchLog ELSE Append(switchLog, entry)
+        /\ maxc' = IF entryExists THEN maxc ELSE maxc + 1
+
+    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, serverCache>>
+
+
+\* Switch attempts to send the next log entry to a specific server 's'.
 SwitchAppendEntries(s) ==
     /\ Len(switchLog) > 0  \* Only proceed if the switch has entries to send
-    \* /\ switchNextIndex[s] <= Len(switchLog)
+    /\ switchNextIndex[s] <= Len(switchLog)
     /\ LET nextLogIdxToSend == switchNextIndex[s] \* Index in switchLog to send to server 's'
            entry == switchLog[nextLogIdxToSend]
            entries == << entry >>
@@ -206,12 +243,12 @@ SwitchAppendEntries(s) ==
       IN Send([mtype          |-> AppendSwitchEntriesRequest,
                mentries       |-> entries,
                msource        |-> Switch,
-               mterm          |-> entry.term
+               mterm          |-> entry.term,
                mdest          |-> s])
 
 
        /\ switchNextIndex' = [switchNextIndex EXCEPT ![s] = @ + 1]
-    /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, maxc, leaderCount, serverCache, switchLog >>
+    /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, serverCache, switchLog, maxc>>
 
 \* Server s receives an AppendEntries request from the Switch
 HandleAppendSwitchEntryRequest(s, m) ==
@@ -223,11 +260,46 @@ HandleAppendSwitchEntryRequest(s, m) ==
     \/ /\ m.mterm = currentTerm[s]
        /\ LET receivedEntry == m.entries[1]
           IN
-             /\ serverCache' = Append(serverCache, receivedEntry)
+             /\ serverCache' = [serverCache EXCEPT ![s] = @ \cup {receivedEntry}]
              /\ Discard(m)
 
        \* State unchanged except for serverCache and messages (handled by Discard)
        /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, switchLog, switchNextIndex, maxc>>
+
+
+\* Action: Leader 'i' proposes an entry from its cache by adding it to its own log.
+LeaderProposeFromCache(i) ==
+    /\ state[i] = Leader
+    \* Ensure there's something in the cache to propose
+    /\ serverCache[i] /= {}
+    /\ LET
+           \* Non-deterministically choose an entry from the leader's cache
+           cachedEntry == CHOOSE ce \in serverCache[i] : TRUE
+           newLogEntry == [ term    |-> currentTerm[i],
+                            value   |-> cachedEntry.value,
+                            payload |-> cachedEntry.payload ]
+
+           \* Check if this value is already somewhere in the log (duplicate prevention)
+           valueAlreadyInLog == \E idx \in DOMAIN log[i] : log[i][idx].value = newLogEntry.value
+       IN
+         \* Only proceed if the value isn't already logged
+         /\ ~valueAlreadyInLog
+         /\ LET newEntryIndex == Len(log[i]) + 1
+                newEntryKey == <<newEntryIndex, newLogEntry.term>>
+            IN
+              \* Effect 1: Append the official entry to the leader's log
+              /\ log' = [log EXCEPT ![i] = Append(log[i], newLogEntry)]
+
+              \* Effect 2: Initialize commit stats for the new log entry
+              /\ entryCommitStats' =
+                   entryCommitStats @@ (newEntryKey :> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ])
+
+              \* Remove the chosen entry from the leader's cache (not sure if we want this)
+            \*   /\ serverCache' = [serverCache EXCEPT ![i] = @ \ {cachedEntry}]
+
+         \* Ensure other core state is untouched by this specific action
+         /\ UNCHANGED <<messages, currentTerm, state, votedFor, commitIndex, nextIndex, matchIndex, leaderCount, maxc, switchLog, switchNextIndex>>
+         \* Note: 'log', 'entryCommitStats', 'serverCache' are explicitly changed above.
 
 \* Server i receives an AppendEntries request from server j with
 \* m.mterm <= currentTerm[i]. This just handles m.entries of length 0 or 1, but
@@ -304,6 +376,110 @@ HandleAppendEntriesRequest(i, j, m) ==
                                       Append(log[i], m.mentries[1])]
                        /\ UNCHANGED <<serverVars, commitIndex, messages>>
        /\ UNCHANGED <<candidateVars, leaderVars, instrumentationVars>> \* entryCommitStats unchanged on followers
+
+\* Modified: Follower i handles AppendEntries METADATA request from leader j.
+NewHandleAppendEntriesRequest(i, j, m) ==
+    LET \* Standard Raft log consistency check
+        logOk == \/ m.mprevLogIndex = 0
+                 \/ /\ m.mprevLogIndex > 0
+                    /\ m.mprevLogIndex <= Len(log[i])
+                    /\ m.mprevLogTerm = log[i][m.mprevLogIndex].term
+    IN
+       \* Standard Raft term checks and state updates
+       /\ m.mterm <= currentTerm[i]
+       /\ \/ /\ \* Reject request (standard Raft conditions)
+                \/ m.mterm < currentTerm[i]
+                \/ /\ m.mterm = currentTerm[i]
+                   /\ state[i] = Follower
+                   /\ \lnot logOk
+             /\ Reply([mtype           |-> AppendEntriesResponse,
+                       mterm           |-> currentTerm[i],
+                       msuccess        |-> FALSE,
+                       mmatchIndex     |-> 0, \* Indicate failure at prevLogIndex
+                       msource         |-> i,
+                       mdest           |-> j],
+                       m)
+             /\ UNCHANGED <<serverVars, logVars, serverCache>> \* Cache unchanged on rejection
+          \/ \* Step down if Candidate (standard Raft)
+             /\ m.mterm = currentTerm[i]
+             /\ state[i] = Candidate
+             /\ state' = [state EXCEPT ![i] = Follower]
+             /\ UNCHANGED <<currentTerm, votedFor, logVars, messages, serverCache>>
+          \/ \* Process request (term ok, state follower, log consistent up to prev)
+             /\ m.mterm = currentTerm[i]
+             /\ state[i] = Follower
+             /\ logOk
+             /\ LET index == m.mprevLogIndex + 1
+                IN \/ \* Request has no new entries (standard heartbeat)
+                       /\ m.mentries = << >>
+                       \* Update commit index based on leader's signal
+                       /\ commitIndex' = [commitIndex EXCEPT ![i] = Max({commitIndex[i], m.mcommitIndex})]
+                       /\ Reply([mtype           |-> AppendEntriesResponse,
+                                 mterm           |-> currentTerm[i],
+                                 msuccess        |-> TRUE,
+                                 mmatchIndex     |-> m.mprevLogIndex, \* Matched up to prev index
+                                 msource         |-> i,
+                                 mdest           |-> j],
+                                 m)
+                       /\ UNCHANGED <<serverVars, log, serverCache>>
+                   \/ \* Request HAS new metadata entries
+                       /\ m.mentries /= << >>
+                       /\ LET \* <<< HOVERCRAFT CHANGE >>> Check Follower Cache
+                              entryMetadata == m.mentries[1] \* Extract metadata sent by leader
+                              \* Find matching entry in cache based on VALUE and TERM from metadata
+                              \* (Term check ensures we match data associated with the correct proposal term)
+                              MatchingCacheEntries == { ce \in serverCache[i] :
+                                                          /\ ce.value = entryMetadata.value
+                                                          /\ ce.term = entryMetadata.term }
+                              cacheHit == (MatchingCacheEntries /= {})
+                          IN \/ /\ ~cacheHit \* Cache MISS: Data not found
+                                 /\ Reply([mtype           |-> AppendEntriesResponse,
+                                           mterm           |-> currentTerm[i],
+                                           msuccess        |-> FALSE,
+                                           \* Failure implies mismatch at prevLogIndex, or data missing.
+                                           \* Leader will retry prevLogIndex based on Raft logic.
+                                           mmatchIndex     |-> 0,
+                                           msource         |-> i,
+                                           mdest           |-> j],
+                                           m)
+                                 /\ UNCHANGED <<serverVars, logVars, serverCache>>
+                             \/ /\ cacheHit \* Cache HIT: Data found
+                                 /\ LET MatchingCacheEntry == CHOOSE ce \in MatchingCacheEntries : TRUE
+                                        \* Construct full entry using metadata term/value and cache payload
+                                        fullEntryToLog == [ term    |-> entryMetadata.term,
+                                                            value   |-> entryMetadata.value,
+                                                            payload |-> MatchingCacheEntry.payload ]
+                                    IN \/ \* Conflict: Entry exists at index, but term differs
+                                           /\ Len(log[i]) >= index
+                                           /\ log[i][index].term /= fullEntryToLog.term
+                                           \* Truncate follower's log (standard Raft conflict handling)
+                                           /\ LET newLog == SubSeq(log[i], 1, index - 1)
+                                              IN log' = [log EXCEPT ![i] = newLog]
+                                           \* Remove entry from cache *after* successful processing? Maybe not here.
+                                           /\ UNCHANGED <<serverVars, commitIndex, messages, serverCache>>
+                                       \/ \* No conflict: Append or entry already matches
+                                           /\ \/ Len(log[i]) = index - 1 \* Ready to append
+                                              \/ /\ Len(log[i]) >= index   \* Entry might already be here
+                                                 /\ log[i][index].term = fullEntryToLog.term
+                                                 \* (No need to check value, Raft guarantees if term/index match, value matches)
+                                           \* Append if missing, otherwise log is unchanged
+                                           /\ log' = IF Len(log[i]) = index - 1
+                                                     THEN [log EXCEPT ![i] = Append(log[i], fullEntryToLog)]
+                                                     ELSE log
+                                           \* Update commit index based on leader's signal
+                                           /\ commitIndex' = [commitIndex EXCEPT ![i] = Max({commitIndex[i], m.mcommitIndex})]
+                                           \* Send success response
+                                           /\ Reply([mtype           |-> AppendEntriesResponse,
+                                                     mterm           |-> currentTerm[i],
+                                                     msuccess        |-> TRUE,
+                                                     mmatchIndex     |-> index, \* Success up to this new index
+                                                     msource         |-> i,
+                                                     mdest           |-> j],
+                                                     m)
+                                           /\ UNCHANGED <<serverVars>>
+
+       /\ UNCHANGED <<candidateVars, leaderVars, entryCommitStats, leaderCount, switchLog, switchNextIndex>> \* Switch state unaffected
+
 
 \* Server i receives an AppendEntries response from server j with
 \* m.mterm = currentTerm[i].

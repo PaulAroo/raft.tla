@@ -22,7 +22,7 @@ Receive(m) ==
           /\ \/ DropStaleResponse(i, j, m)
              \/ HandleRequestVoteResponse(i, j, m)
        \/ /\ m.mtype = AppendEntriesRequest
-          /\ HandleAppendEntriesRequest(i, j, m)
+          /\ NewHandleAppendEntriesRequest(i, j, m)
        \/ /\ m.mtype = AppendEntriesResponse
           /\ \/ DropStaleResponse(i, j, m)
              \/ HandleAppendEntriesResponse(i, j, m)
@@ -55,7 +55,7 @@ MyNext ==
         \*    \/ \E i \in Server, v \in Value : state[i] = Leader /\ ClientRequest(i, v)
            \/ \E leader \in Server, v \in Value : state[leader] = Leader /\ SwitchAcceptAndLogRequest(leader, v)
            \/ \E i \in Server : AdvanceCommitIndex(i)
-           \/ \E i,j \in Server : i /= j /\ AppendEntries(i, j)
+           \/ \E i,j \in Server : i /= j /\ AppendMetaDataEntries(i, j)
            \/ \E m \in {msg \in ValidMessage(messages) : \* to visualize possible messages
                     msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse, AppendSwitchEntriesRequest}} : Receive(m)
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
@@ -63,7 +63,9 @@ MyNext ==
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
 \*                    msg.mtype \in {RequestVoteRequest}} : DropMessage(m)
         \* NEW Trigger structure for Switch sending data INDIVIDUALLY
-            \/ \E s \in Server : SwitchAppendEntries(s)  \* Action sends data FROM Switch TO server 's'
+            \/ \E i \in Server : SwitchAppendEntries(i)  \* Action sends data FROM Switch TO server 'i'
+        \* << NEW >> Trigger for Leader proposing from its cache
+            \/ \E s \in Server: LeaderProposeFromCache(s)
 
 
 \* The specification must start with the initial state and transition according
