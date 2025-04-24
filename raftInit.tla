@@ -46,7 +46,7 @@ MyInit ==
     /\ votesGranted = [s \in Server |-> IF s = r2 THEN {r1, r3} ELSE {}]
     /\ votesResponded = [s \in Server |-> IF s = r2 THEN {r1, r3} ELSE {}]
     /\ entryCommitStats = [ idx_term \in {} |-> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ] ] \* Initialize here too
-    /\ switchLog = << >>  \* << NEW >> Initialize Switch log
+    /\ switchLog = <<>>  \* << NEW >> Initialize Switch log
     /\ serverCache = [s \in Server |-> {}] \* << NEW >> Initialize follower cache
     /\ switchNextIndex = [s \in Server |-> 1] \* << NEW >>
 

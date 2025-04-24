@@ -30,6 +30,8 @@ VARIABLE serverCache
 \* << NEW >> Used to track the next entry to send to each server from switch's log
 VARIABLE switchNextIndex
 
+switchVars == <<switchLog, switchNextIndex>>
+
 instrumentationVars == <<leaderCount, maxc, entryCommitStats, switchLog, serverCache, switchNextIndex>>
 
 \* The following variables are all per server (functions with domain Server).

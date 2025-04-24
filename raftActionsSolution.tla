@@ -216,8 +216,7 @@ AppendMetaDataEntries(i, j) ==
             THEN [entryCommitStats EXCEPT ![entryKey].sentCount = @ + 1]
             ELSE entryCommitStats
 
-    /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, maxc, leaderCount,
-                     switchLog, switchNextIndex, serverCache>>
+    /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, maxc, leaderCount, switchVars, serverCache>>
 
 SwitchAcceptAndLogRequest(leader, v) ==
     /\ maxc < MaxClientRequests
@@ -229,7 +228,7 @@ SwitchAcceptAndLogRequest(leader, v) ==
         /\ switchLog' = IF entryExists THEN switchLog ELSE Append(switchLog, entry)
         /\ maxc' = IF entryExists THEN maxc ELSE maxc + 1
 
-    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, serverCache>>
+    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, serverCache, switchNextIndex>>
 
 
 \* Switch attempts to send the next log entry to a specific server 's'.
@@ -258,13 +257,13 @@ HandleAppendSwitchEntryRequest(s, m) ==
        /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, switchLog, switchNextIndex, maxc, serverCache>>
 
     \/ /\ m.mterm = currentTerm[s]
-       /\ LET receivedEntry == m.entries[1]
+       /\ LET receivedEntry == m.mentries[1]
           IN
              /\ serverCache' = [serverCache EXCEPT ![s] = @ \cup {receivedEntry}]
              /\ Discard(m)
 
        \* State unchanged except for serverCache and messages (handled by Discard)
-       /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, switchLog, switchNextIndex, maxc>>
+       /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, switchVars, maxc>>
 
 
 \* Action: Leader 'i' proposes an entry from its cache by adding it to its own log.
@@ -298,7 +297,7 @@ LeaderProposeFromCache(i) ==
             \*   /\ serverCache' = [serverCache EXCEPT ![i] = @ \ {cachedEntry}]
 
          \* Ensure other core state is untouched by this specific action
-         /\ UNCHANGED <<messages, currentTerm, state, votedFor, commitIndex, nextIndex, matchIndex, leaderCount, maxc, switchLog, switchNextIndex>>
+         /\ UNCHANGED <<messages, currentTerm, state, votedFor, commitIndex, nextIndex, matchIndex, leaderCount, maxc, switchVars, serverCache, voterLog, votesGranted, votesResponded>>
          \* Note: 'log', 'entryCommitStats', 'serverCache' are explicitly changed above.
 
 \* Server i receives an AppendEntries request from server j with
@@ -476,9 +475,9 @@ NewHandleAppendEntriesRequest(i, j, m) ==
                                                      msource         |-> i,
                                                      mdest           |-> j],
                                                      m)
-                                           /\ UNCHANGED <<serverVars>>
+                                           /\ UNCHANGED <<serverVars, serverCache>>
 
-       /\ UNCHANGED <<candidateVars, leaderVars, entryCommitStats, leaderCount, switchLog, switchNextIndex>> \* Switch state unaffected
+       /\ UNCHANGED <<candidateVars, leaderVars, entryCommitStats, leaderCount, switchVars, maxc, serverCache>> \* Switch state unaffected
 
 
 \* Server i receives an AppendEntries response from server j with
@@ -506,7 +505,7 @@ HandleAppendEntriesResponse(i, j, m) ==
                                Max({nextIndex[i][j] - 1, 1})]
           /\ UNCHANGED <<matchIndex, entryCommitStats>>
     /\ Discard(m)
-    /\ UNCHANGED <<serverVars, candidateVars, logVars, maxc, leaderCount>>
+    /\ UNCHANGED <<serverVars, candidateVars, logVars, maxc, leaderCount, switchVars, serverCache>>
 
 \* Leader i advances its commitIndex.
 \* This is done as a separate step from handling AppendEntries responses,
@@ -539,7 +538,7 @@ AdvanceCommitIndex(i) ==
                    IF key \in keysToUpdate
                    THEN [ entryCommitStats[key] EXCEPT !.committed = TRUE ] \* Update record
                    ELSE entryCommitStats[key] ]                             \* Keep old record       
-    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, log, maxc, leaderCount>>
+    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, log, maxc, leaderCount, switchVars, serverCache>>
 
 \* Network state transitions
 
