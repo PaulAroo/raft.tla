@@ -47,4 +47,5 @@ First steps towards implementation
 - Added new actions
   - `LeaderProposeFromCache`: Leader moves an entry from its cache to it's log, AppendEntries actions then ensures the metadata from this entry is sent to the followers
   - `NewHandleAppendEntriesRequest`: modified version of `HandleAppendEntriesRequest` where a follower handles Metadata related request from the leader (check its cache for matching entry before sending a successful response)
+  - `HandleRecoveryRequest`: implements a recovery mechanism for cache misses in followers
   - Updated `MyInit` and `MyNext` as needed

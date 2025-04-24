@@ -218,9 +218,11 @@ AppendMetaDataEntries(i, j) ==
 
     /\ UNCHANGED <<serverVars, candidateVars, leaderVars, logVars, maxc, leaderCount, switchVars, serverCache>>
 
-SwitchAcceptAndLogRequest(leader, v) ==
+SwitchAcceptAndLogRequest(v) ==
     /\ maxc < MaxClientRequests
-    /\ LET entryTerm == currentTerm[leader]
+    /\ \E i \in Server : state[i] = Leader
+    /\ LET leader == CHOOSE s \in Server : state[s] = Leader
+           entryTerm == currentTerm[leader]
            entry == [term |-> entryTerm, value |-> v, payload |-> v]
            entryExists == \E index \in DOMAIN switchLog : switchLog[index].value = v /\ switchLog[index].payload = v /\ switchLog[index].term = entryTerm
           \*  newLog == IF entryExists THEN switchLog ELSE Append(switchLog, entry)
@@ -431,17 +433,25 @@ NewHandleAppendEntriesRequest(i, j, m) ==
                                                           /\ ce.value = entryMetadata.value
                                                           /\ ce.term = entryMetadata.term }
                               cacheHit == (MatchingCacheEntries /= {})
+                              \* recovery request to the Leader (j)
+                              recoveryMsg == [ mtype   |-> RecoveryRequest,
+                                               msource |-> i,           \* Follower requesting
+                                               mdest   |-> j,
+                                               mterm   |-> entryMetadata.term,  \* Term of missing data
+                                               mvalue  |-> entryMetadata.value \* Value of missing data
+                                              ]
                           IN \/ /\ ~cacheHit \* Cache MISS: Data not found
-                                 /\ Reply([mtype           |-> AppendEntriesResponse,
-                                           mterm           |-> currentTerm[i],
-                                           msuccess        |-> FALSE,
-                                           \* Failure implies mismatch at prevLogIndex, or data missing.
-                                           \* Leader will retry prevLogIndex based on Raft logic.
-                                           mmatchIndex     |-> 0,
-                                           msource         |-> i,
-                                           mdest           |-> j],
-                                           m)
-                                 /\ UNCHANGED <<serverVars, logVars, serverCache>>
+                                /\ Send(recoveryMsg)
+                                /\ Reply([mtype           |-> AppendEntriesResponse,
+                                          mterm           |-> currentTerm[i],
+                                          msuccess        |-> FALSE,
+                                          \* Failure implies cache miss
+                                          \* Leader will retry prevLogIndex based on Raft logic.
+                                          mmatchIndex     |-> 0,
+                                          msource         |-> i,
+                                          mdest           |-> j],
+                                          m)
+                                /\ UNCHANGED <<serverVars, logVars, serverCache>>
                              \/ /\ cacheHit \* Cache HIT: Data found
                                  /\ LET MatchingCacheEntry == CHOOSE ce \in MatchingCacheEntries : TRUE
                                         \* Construct full entry using metadata term/value and cache payload
@@ -478,6 +488,26 @@ NewHandleAppendEntriesRequest(i, j, m) ==
                                            /\ UNCHANGED <<serverVars, serverCache>>
 
        /\ UNCHANGED <<candidateVars, leaderVars, entryCommitStats, leaderCount, switchVars, maxc, serverCache>> \* Switch state unaffected
+
+\* Server i receives the request from follower j.
+HandleRecoveryRequest(i, j, m) ==
+    \* /\ m.mdest = i
+    \* /\ m.msource = j
+    /\ m.mterm <= currentTerm[i] \* Ignore stale requests
+
+    /\ LET termToFind == m.mterm
+           valueToFind == m.mvalue
+           \* Search the servers's cache for the requested entry
+           MatchingCacheEntries == { ce \in serverCache[i] :
+                                         /\ ce.value = valueToFind
+                                         /\ ce.term = termToFind }
+           cacheHit == (MatchingCacheEntries /= {})
+           
+       IN
+          \* update server j's cache with the matching entries
+          /\ serverCache' = IF ~cacheHit THEN serverCache ELSE [serverCache EXCEPT ![j] = @ \cup MatchingCacheEntries]
+          /\ Discard(m)
+    /\ UNCHANGED <<serverVars, logVars, instrumentationVars>>
 
 
 \* Server i receives an AppendEntries response from server j with

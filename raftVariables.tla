@@ -32,7 +32,7 @@ VARIABLE switchNextIndex
 
 switchVars == <<switchLog, switchNextIndex>>
 
-instrumentationVars == <<leaderCount, maxc, entryCommitStats, switchLog, serverCache, switchNextIndex>>
+instrumentationVars == <<leaderCount, maxc, entryCommitStats, switchVars, serverCache>>
 
 \* The following variables are all per server (functions with domain Server).
 

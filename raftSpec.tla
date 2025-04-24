@@ -27,9 +27,11 @@ Receive(m) ==
           /\ \/ DropStaleResponse(i, j, m)
              \/ HandleAppendEntriesResponse(i, j, m)
 
-        \* --- New HoverCraft Handler ---
+        \* --- New HoverCraft related Handlers ---
        \/ /\ m.mtype = AppendSwitchEntriesRequest
           /\ HandleAppendSwitchEntryRequest(i, m)
+       \/ /\ m.mtype = RecoveryRequest
+          /\ HandleRecoveryRequest(i, j, m)
 
 \* Defines how the variables may transition.
 Next == 
@@ -53,13 +55,13 @@ MyNext ==
 \*           \/ \E i,j \in Server : i /= j /\ RequestVote(i, j)
 \*           \/ \E i \in Server : BecomeLeader(i)
         \*    \/ \E i \in Server, v \in Value : state[i] = Leader /\ ClientRequest(i, v)
-           \/ \E leader \in Server, v \in Value : state[leader] = Leader /\ SwitchAcceptAndLogRequest(leader, v)
+           \/ \E v \in Value : SwitchAcceptAndLogRequest(v)
            \/ \E i \in Server : SwitchAppendEntries(i) \* Action sends data FROM Switch TO server 'i'
            \/ \E s \in Server: LeaderProposeFromCache(s) \* Trigger for Leader proposing from its cache (move entry from it's cache to it's log)
            \/ \E i,j \in Server : AppendMetaDataEntries(i, j)
            \/ \E i \in Server : AdvanceCommitIndex(i)
            \/ \E m \in {msg \in ValidMessage(messages) : \* to visualize possible messages
-                    msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse, AppendSwitchEntriesRequest}} : Receive(m)
+                    msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse, AppendSwitchEntriesRequest, RecoveryRequest}} : Receive(m)
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
 \*                    msg.mtype \in {AppendEntriesRequest}} : DuplicateMessage(m)
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 

@@ -19,7 +19,7 @@ CONSTANTS Nil
 
 \* Message types:
 CONSTANTS RequestVoteRequest, RequestVoteResponse,
-          AppendEntriesRequest, AppendEntriesResponse, AppendSwitchEntriesRequest
+          AppendEntriesRequest, AppendEntriesResponse, AppendSwitchEntriesRequest, RecoveryRequest
 
 \* for instrumentation to limit model state space
 CONSTANTS MaxClientRequests
