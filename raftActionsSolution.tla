@@ -232,6 +232,20 @@ SwitchAcceptAndLogRequest(v) ==
 
     /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, serverCache, switchNextIndex>>
 
+SwitchHandleClientRequest(v) ==
+    /\ maxc < MaxClientRequests
+    /\ \E i \in Server : state[i] = Leader
+    /\ LET leader == CHOOSE s \in Server : state[s] = Leader
+           entryTerm == currentTerm[leader]
+           entry == [term |-> entryTerm, value |-> v, payload |-> v]
+           entryExists == \E index \in DOMAIN switchLog : switchLog[index].value = v /\ switchLog[index].payload = v /\ switchLog[index].term = entryTerm
+          \*  newLog == IF entryExists THEN switchLog ELSE Append(switchLog, entry)
+       IN
+        /\ switchLog' = IF entryExists THEN switchLog ELSE Append(switchLog, entry)
+        /\ serverCache' = IF entryExists THEN serverCache ELSE [s \in Server |-> serverCache[s] \cup {entry}]
+        /\ maxc' = IF entryExists THEN maxc ELSE maxc + 1
+
+    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, entryCommitStats, leaderCount, switchNextIndex>>
 
 \* Switch attempts to send the next log entry to a specific server 's'.
 SwitchAppendEntries(s) ==

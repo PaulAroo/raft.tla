@@ -49,3 +49,7 @@ First steps towards implementation
   - `NewHandleAppendEntriesRequest`: modified version of `HandleAppendEntriesRequest` where a follower handles Metadata related request from the leader (check its cache for matching entry before sending a successful response)
   - `HandleRecoveryRequest`: implements a recovery mechanism for cache misses in followers
   - Updated `MyInit` and `MyNext` as needed
+
+------
+Explored another strategy:
+- A single action `SwitchHandleClientRequest`, where the switch logs and appends the entry to the servers cache simultaneously (the general state space and number of distinct states drastically reduced)

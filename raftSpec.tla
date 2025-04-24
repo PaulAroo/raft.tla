@@ -55,13 +55,14 @@ MyNext ==
 \*           \/ \E i,j \in Server : i /= j /\ RequestVote(i, j)
 \*           \/ \E i \in Server : BecomeLeader(i)
         \*    \/ \E i \in Server, v \in Value : state[i] = Leader /\ ClientRequest(i, v)
-           \/ \E v \in Value : SwitchAcceptAndLogRequest(v)
-           \/ \E i \in Server : SwitchAppendEntries(i) \* Action sends data FROM Switch TO server 'i'
+        \*    \/ \E v \in Value : SwitchAcceptAndLogRequest(v)
+           \/ \E v \in Value : SwitchHandleClientRequest(v)
+        \*    \/ \E i \in Server : SwitchAppendEntries(i) \* Action sends data FROM Switch TO server 'i'
            \/ \E s \in Server: LeaderProposeFromCache(s) \* Trigger for Leader proposing from its cache (move entry from it's cache to it's log)
            \/ \E i,j \in Server : AppendMetaDataEntries(i, j)
            \/ \E i \in Server : AdvanceCommitIndex(i)
            \/ \E m \in {msg \in ValidMessage(messages) : \* to visualize possible messages
-                    msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse, AppendSwitchEntriesRequest, RecoveryRequest}} : Receive(m)
+                    msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse, RecoveryRequest}} : Receive(m)
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
 \*                    msg.mtype \in {AppendEntriesRequest}} : DuplicateMessage(m)
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
