@@ -143,6 +143,23 @@ ClientRequest(i, v) ==
               ELSE entryCommitStats
     /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, commitIndex, leaderCount>>
 
+\* Modified. Leader i receives a client request to add v to the log. up to MaxClientRequests.
+SwitchClientRequest(i, v) ==
+    \* /\ i = SwitchAndServerIndices.switch
+    /\ state[i] = Switch
+    /\ maxc < MaxClientRequests 
+    /\ LET leader == CHOOSE s \in Server : state[s] = Leader
+           entryTerm == currentTerm[leader]
+           entry == [term |-> entryTerm, value |-> v, payload |-> v]
+           entryExists == \E j \in DOMAIN log[i] : log[i][j].value = v /\ log[i][j].term = entryTerm /\ log[i][j].payload = v
+           newLog == IF entryExists THEN log[i] ELSE Append(log[i], entry)
+           newEntryIndex == Len(log[i]) + 1
+           newEntryKey == <<newEntryIndex, entryTerm>>
+       IN
+        /\ log' = [log EXCEPT ![i] = newLog]
+        /\ maxc' = IF entryExists THEN maxc ELSE maxc + 1
+    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, commitIndex, leaderCount, entryCommitStats>>
+
 \* Modified. Leader i sends j an AppendEntries request containing exactly 1 entry. It was up to 1 entry.
 \* While implementations may want to send more than 1 at a time, this spec uses
 \* just 1 because it minimizes atomic regions without loss of generality.

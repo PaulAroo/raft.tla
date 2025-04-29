@@ -58,12 +58,14 @@ MyNext ==
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
 \*                    msg.mtype \in {RequestVoteRequest}} : DropMessage(m)
 
+MyNextNew == \/ \E i \in Server, v \in Value : SwitchClientRequest(i, v)
+
 
 \* The specification must start with the initial state and transition according
 \* to Next.
 Spec == Init /\ [][Next]_vars
 
-MySpec == MyInit /\ [][MyNext]_vars
+MySpec == MyInit /\ [][MyNextNew]_vars
 
 \* -------------------- Invariants --------------------
 

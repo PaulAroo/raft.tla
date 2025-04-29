@@ -4,6 +4,9 @@ EXTENDS raftConstants
 
 \* Global variables
 
+\* track indices of leader of and switch
+\* VARIABLE SwitchAndServerIndices
+
 \* A bag of records representing requests and responses sent from one server
 \* to another. This is a function mapping Message to Nat.
 VARIABLE messages
