@@ -143,6 +143,21 @@ ClientRequest(i, v) ==
               ELSE entryCommitStats
     /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, commitIndex, leaderCount>>
 
+\* i: leader, v: value
+SwitchClientRequest(switchIdx, i, v) == 
+    /\ maxc < MaxClientRequests
+    /\ state[switchIdx] = Switch
+    /\ LET entryTerm == currentTerm[i]
+           newEntry == [term |-> entryTerm, value |-> v, payload |-> v]
+           entryExists == v \in DOMAIN switchBuffer
+       IN
+        /\ switchBuffer' = IF entryExists
+                           THEN switchBuffer
+                           ELSE switchBuffer @@ (v :> newEntry) \* Add/override v with newEntry
+        /\ maxc' = IF entryExists THEN maxc ELSE maxc + 1
+
+    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, logVars, commitIndex, leaderCount, entryCommitStats, unorderedRequests, switchIndex, switchSentRecord, Servers>>
+
 \* Modified. Leader i sends j an AppendEntries request containing exactly 1 entry. It was up to 1 entry.
 \* While implementations may want to send more than 1 at a time, this spec uses
 \* just 1 because it minimizes atomic regions without loss of generality.

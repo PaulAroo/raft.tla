@@ -58,12 +58,21 @@ MyNext ==
 \*           \/ \E m \in {msg \in ValidMessage(messages) : 
 \*                    msg.mtype \in {RequestVoteRequest}} : DropMessage(m)
 
+MySwitchNext == 
+   \/ \E i \in Servers, v \in Value : state[i] = Leader /\ SwitchClientRequest(switchIndex, i, v)
+\* \*    \/ \E i \in Servers, v \in DOMAIN switchBuffer : SwitchClientRequestReplicate(switchIndex, i, v)
+\*    \/ \E i \in Servers, v \in DOMAIN switchBuffer : state[i] = Leader /\ LeaderIngestHovercRaftRequest(i, v)
+\*    \/ \E i \in Servers : AdvanceCommitIndex(i)
+\*    \/ \E i,j \in Servers : i /= j /\ AppendEntries(i, j)
+\*    \/ \E m \in {msg \in ValidMessage(messages) : msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse}} : Receive(m)
+
 
 \* The specification must start with the initial state and transition according
 \* to Next.
 Spec == Init /\ [][Next]_vars
 
-MySpec == MyInit /\ [][MyNext]_vars
+MySpec == MyNewInit /\ [][MySwitchNext]_vars
+\* MySpec == MyInit /\ [][MyNext]_vars
 
 \* -------------------- Invariants --------------------
 
