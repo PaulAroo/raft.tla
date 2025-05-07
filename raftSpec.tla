@@ -59,12 +59,12 @@ MyNext ==
 \*                    msg.mtype \in {RequestVoteRequest}} : DropMessage(m)
 
 MySwitchNext == 
-   \/ \E i \in Servers, v \in Value : state[i] = Leader /\ SwitchClientRequest(switchIndex, i, v)
-\* \*    \/ \E i \in Servers, v \in DOMAIN switchBuffer : SwitchClientRequestReplicate(switchIndex, i, v)
-\*    \/ \E i \in Servers, v \in DOMAIN switchBuffer : state[i] = Leader /\ LeaderIngestHovercRaftRequest(i, v)
-\*    \/ \E i \in Servers : AdvanceCommitIndex(i)
-\*    \/ \E i,j \in Servers : i /= j /\ AppendEntries(i, j)
-\*    \/ \E m \in {msg \in ValidMessage(messages) : msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse}} : Receive(m)
+  \/ \E i \in Servers, v \in Value : state[i] = Leader /\ SwitchClientRequest(switchIndex, i, v)
+  \/ \E i \in Servers, v \in DOMAIN switchBuffer : SwitchClientRequestReplicate(switchIndex, i, v)
+  \/ \E i \in Servers, v \in DOMAIN switchBuffer : state[i] = Leader /\ LeaderIngestHovercRaftRequest(i, v)
+  \/ \E i \in Servers : AdvanceCommitIndex(i)
+  \/ \E i,j \in Servers : i /= j /\ AppendEntries(i, j)
+  \/ \E m \in {msg \in ValidMessage(messages) : msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse}} : Receive(m)
 
 
 \* The specification must start with the initial state and transition according
@@ -82,6 +82,10 @@ MoreThanOneLeaderInv ==
          /\ state[i] = Leader
          /\ state[j] = Leader)
         => i = j
+
+\* fake invariant to check the first two actions in MySwitchNext
+AllServersHaveOneUnorderedRequestInv ==
+    \E s \in Servers :  Cardinality(unorderedRequests[s]) /= 2
 
 \* Every (index, term) pair determines a log prefix.
 \* From page 8 of the Raft paper: "If two logs contain an entry with the same index and term, then the logs are identical in all preceding entries."
