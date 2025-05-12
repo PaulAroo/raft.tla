@@ -329,78 +329,6 @@ HandleAppendEntriesRequest(i, j, m) ==
                        /\ UNCHANGED <<serverVars, commitIndex, messages>>
        /\ UNCHANGED <<candidateVars, leaderVars, instrumentationVars, switchIndex, switchBuffer, switchSentRecord, Servers>> \* entryCommitStats unchanged on followers
 
-\* HandleAppendEntriesRequest(i, j, m) ==
-\*     LET logOk == \/ m.mprevLogIndex = 0
-\*                  \/ /\ m.mprevLogIndex > 0
-\*                     /\ m.mprevLogIndex <= Len(log[i])
-\*                     /\ m.mprevLogTerm = log[i][m.mprevLogIndex].term
-\*     IN /\ m.mterm <= currentTerm[i]
-\*        /\ \/ /\ \* reject request
-\*                 \/ m.mterm < currentTerm[i]
-\*                 \/ /\ m.mterm = currentTerm[i]
-\*                    /\ state[i] = Follower
-\*                    /\ \lnot logOk
-\*              /\ Reply([mtype           |-> AppendEntriesResponse,
-\*                        mterm           |-> currentTerm[i],
-\*                        msuccess        |-> FALSE,
-\*                        mmatchIndex     |-> 0,
-\*                        msource         |-> i,
-\*                        mdest           |-> j],
-\*                        m)
-\*              /\ UNCHANGED <<serverVars, logVars>>
-\*           \/ \* return to follower state
-\*              /\ m.mterm = currentTerm[i]
-\*              /\ state[i] = Candidate
-\*              /\ state' = [state EXCEPT ![i] = Follower]
-\*              /\ UNCHANGED <<currentTerm, votedFor, logVars, messages>>
-\*           \/ \* accept request
-\*              /\ m.mterm = currentTerm[i]
-\*              /\ state[i] = Follower
-\*              /\ logOk
-\*              /\ LET index == m.mprevLogIndex + 1
-\*                 IN \/ \* already done with request
-\*                        /\ \/ m.mentries = << >>
-\*                           \/ /\ m.mentries /= << >>
-\*                              /\ Len(log[i]) >= index
-\*                              /\ log[i][index].term = m.mentries[1].term
-\*                           \* This could make our commitIndex decrease (for
-\*                           \* example if we process an old, duplicated request),
-\*                           \* but that doesn't really affect anything.
-\*                        /\ commitIndex' = [commitIndex EXCEPT ![i] =
-\*                                               m.mcommitIndex]   
-\* \*                       /\ commitIndex' = [commitIndex EXCEPT ![i] = 
-\* \*                                            IF commitIndex[i] < m.mcommitIndex THEN 
-\* \*                                                Min({m.mcommitIndex, Len(log[i])}) 
-\* \*                                            ELSE 
-\* \*                                                commitIndex[i]]
-\*                        /\ Reply([mtype           |-> AppendEntriesResponse,
-\*                                  mterm           |-> currentTerm[i],
-\*                                  msuccess        |-> TRUE,
-\*                                  mmatchIndex     |-> m.mprevLogIndex +
-\*                                                      Len(m.mentries),
-\*                                  msource         |-> i,
-\*                                  mdest           |-> j],
-\*                                  m)
-\*                        /\ UNCHANGED <<serverVars, log>>
-\*                    \/ \* conflict: remove 1 entry (simplified from original spec - assumes entry length 1)
-\*                       \* since we do not send empty entries, we have to provide a larger set of values to ensure some progress
-\*                        /\ m.mentries /= << >>
-\*                        /\ Len(log[i]) >= index
-\*                        /\ log[i][index].term /= m.mentries[1].term
-\*                        /\ LET newLog == SubSeq(log[i], 1, index - 1) \* Truncate log
-\*                           IN log' = [log EXCEPT ![i] = newLog]
-\* \*                       /\ LET new == [index2 \in 1..(Len(log[i]) - 1) |->
-\* \*                                          log[i][index2]]
-\* \*                          IN log' = [log EXCEPT ![i] = new]
-\*                        /\ UNCHANGED <<serverVars, commitIndex, messages>>
-\*                    \/ \* no conflict: append entry
-\*                        /\ m.mentries /= << >>
-\*                        /\ Len(log[i]) = m.mprevLogIndex
-\*                        /\ log' = [log EXCEPT ![i] =
-\*                                       Append(log[i], m.mentries[1])]
-\*                        /\ UNCHANGED <<serverVars, commitIndex, messages>>
-\*        /\ UNCHANGED <<candidateVars, leaderVars, instrumentationVars>> \* entryCommitStats unchanged on followers
-
 \* Server i receives an AppendEntries response from server j with
 \* m.mterm = currentTerm[i].
 HandleAppendEntriesResponse(i, j, m) ==
@@ -435,7 +363,7 @@ HandleAppendEntriesResponse(i, j, m) ==
 AdvanceCommitIndex(i) ==
     /\ state[i] = Leader
     /\ LET \* The set of servers that agree up through index.
-           Agree(index) == {i} \cup {k \in Server :
+           Agree(index) == {i} \cup {k \in Servers :
                                          matchIndex[i][k] >= index}
            \* The maximum indexes for which a quorum agrees
            agreeIndexes == {index \in 1..Len(log[i]) :

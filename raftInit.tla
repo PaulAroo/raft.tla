@@ -80,7 +80,7 @@ MyNewInit ==
     /\ voterLog = [s \in Server |-> IF s = r2 THEN (r1 :> <<>> @@ r3 :> <<>> @@ r4 :> <<>>) ELSE <<>>]
     /\ votesGranted = [s \in Server |-> IF s = r2 THEN {r1, r3, r4} ELSE {}]
     /\ votesResponded = [s \in Server |-> IF s = r2 THEN {r1, r3, r4} ELSE {}]
-    /\ entryCommitStats = [ idx_term \in {} |-> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ] ] \* Initialize here too
+    /\ entryCommitStats = [ idx_term \in {} |-> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ] ]
 
 \* to be used directly in model Init the value
 \*MyInit2 ==
