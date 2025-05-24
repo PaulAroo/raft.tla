@@ -21,11 +21,12 @@ VARIABLE maxc
 \*   committed |-> Bool ] \* Flag indicating if the entry is committed
 VARIABLE entryCommitStats
 
-\* 
+\* server set that excludes switch and network aggregator
 VARIABLE Servers
 
-\* index into Server
 VARIABLE switchIndex
+
+VARIABLE NetAggIndex
 
 \* Temporary storage for requests received by the switch before they're ordered
 \* Maps request value to the full payload entry
@@ -40,7 +41,7 @@ VARIABLE unorderedRequests
 VARIABLE switchSentRecord
 
 \* New HovercRaft variables
-hovercraftVars == <<switchBuffer, unorderedRequests, switchIndex, switchSentRecord>>
+hovercraftVars == <<switchBuffer, unorderedRequests, switchIndex, switchSentRecord, NetAggIndex>>
 
 instrumentationVars == <<leaderCount, maxc, entryCommitStats>>
 

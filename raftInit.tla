@@ -49,14 +49,17 @@ MyInit ==
 
 
 MyNewInit ==
-    LET ServerSet4 == CHOOSE S \in SUBSET(Server) : Cardinality(S) = 4
-        TheSwitchId == CHOOSE s \in ServerSet4 : TRUE
-        ServersSet == ServerSet4 \ {TheSwitchId}
+    LET ServerSet5 == CHOOSE S \in SUBSET(Server) : Cardinality(S) = 5
+        TheSwitchId == CHOOSE s \in ServerSet5 : TRUE
+        ServersSet4 == ServerSet5 \ {TheSwitchId}
+        NetAggId == CHOOSE s \in ServersSet4 : TRUE
+        ServersSet == ServersSet4 \ {NetAggId}
         ServerIds == CHOOSE ids \in [1..3 -> ServersSet] : TRUE
         r1 == TheSwitchId
-        r2 == ServerIds[1]
-        r3 == ServerIds[2]
-        r4 == ServerIds[3]
+        r2 == NetAggId
+        r3 == ServerIds[1]
+        r4 == ServerIds[2]
+        r5 == ServerIds[3]
     IN
     \* /\ PrintT("MyInit: switchId=" \o ToString(TheSwitchId))
     \* /\ PrintT("MyInit: ServersSet=" \o ToString(ServerSet4))
@@ -65,21 +68,22 @@ MyNewInit ==
     /\ Servers = ServersSet
     /\ commitIndex = [s \in Server |-> 0]
     /\ currentTerm = [s \in Server |-> 2]
-    /\ leaderCount = [s \in Server |-> IF s = r2 THEN 1 ELSE 0]
+    /\ leaderCount = [s \in Server |-> IF s = r3 THEN 1 ELSE 0]
     /\ log = [s \in Server |-> <<>>]
     /\ matchIndex = [s \in Server |-> [t \in Server |-> 0]]
     /\ maxc = 0
     /\ messages = [m \in {} |-> 0]  \* Start with empty messages
     /\ nextIndex = [s \in Server |-> [t \in Server |-> 1]]
-    /\ state = [s \in Server |-> IF s = r2 THEN Leader ELSE IF s = TheSwitchId THEN Switch ELSE Follower]
+    /\ state = [s \in Server |-> IF s = r3 THEN Leader ELSE IF s = TheSwitchId THEN Switch ELSE IF s = NetAggId THEN NetAgg ELSE Follower]
     /\ switchBuffer = [v \in {} |-> [term |-> 0, value |-> "", payload |-> ""]]
     /\ switchIndex = TheSwitchId
+    /\ NetAggIndex = NetAggId
     /\ switchSentRecord = [s \in Server |-> {}]
     /\ unorderedRequests = [s \in Server |-> {}]
-    /\ votedFor = [s \in Server |-> IF s = r2 THEN Nil ELSE r2]
-    /\ voterLog = [s \in Server |-> IF s = r2 THEN (r1 :> <<>> @@ r3 :> <<>> @@ r4 :> <<>>) ELSE <<>>]
-    /\ votesGranted = [s \in Server |-> IF s = r2 THEN {r1, r3, r4} ELSE {}]
-    /\ votesResponded = [s \in Server |-> IF s = r2 THEN {r1, r3, r4} ELSE {}]
+    /\ votedFor = [s \in Server |-> IF s = r3 THEN Nil ELSE r3]
+    /\ voterLog = [s \in Server |-> IF s = r3 THEN (r1 :> <<>> @@ r2 :> <<>> @@ r4 :> <<>> @@ r5 :> <<>>) ELSE <<>>]
+    /\ votesGranted = [s \in Server |-> IF s = r3 THEN {r1, r2, r4, r5} ELSE {}]
+    /\ votesResponded = [s \in Server |-> IF s = r3 THEN {r1, r2, r4, r5} ELSE {}]
     /\ entryCommitStats = [ idx_term \in {} |-> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ] ]
 
 \* to be used directly in model Init the value
