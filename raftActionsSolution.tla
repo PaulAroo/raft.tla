@@ -189,44 +189,45 @@ SwitchClientRequestReplicate(switchIdx, i, v) ==
 \*     /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, commitIndex, leaderCount, maxc, switchBuffer, switchIndex, switchSentRecord, Servers>>
 
     \* Action: Leader 'i' add entry corresponding to value v to its own log.
-LeaderIngestHovercRaftRequest(i, v) ==
+LeaderIngestHovercRaftRequest(aggIndex, i, v) ==
     /\ v \in unorderedRequests[i]
     /\ LET
           newLogEntry == switchBuffer[v]
           newLeaderLog == Append(log[i], newLogEntry)
-        \*   newEntryIndex == Len(log[i]) + 1
-        \*   newEntryKey == <<newEntryIndex, newLogEntry.term>>
+          newNetAggLog == Append(log[aggIndex], newLogEntry)
+          newEntryIndex == Len(log[i]) + 1
+          newEntryKey == <<newEntryIndex, newLogEntry.term>>
           valueAlreadyInLog == \E idx \in DOMAIN log[i] : log[i][idx].value = newLogEntry.value \* also check payload and term fields?
 
        IN
         /\ ~valueAlreadyInLog
-        /\ log' = [log EXCEPT ![i] = newLeaderLog]
-        \* /\ entryCommitStats' = entryCommitStats @@ (newEntryKey :> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ])
-        /\ unorderedRequests' = [unorderedRequests EXCEPT ![i] = @ \ {v}]
+        /\ log' = [log EXCEPT ![i] = newLeaderLog, ![aggIndex] = newNetAggLog]
+        /\ entryCommitStats' = entryCommitStats @@ (newEntryKey :> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ])
+        /\ unorderedRequests' = [unorderedRequests EXCEPT ![i] = @ \ {v}, ![aggIndex] = @ \ {v} ]
 
-    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, commitIndex, leaderCount, maxc, switchBuffer, switchIndex, switchSentRecord, Servers, entryCommitStats, NetAggIndex>>
+    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, commitIndex, leaderCount, maxc, switchBuffer, switchIndex, switchSentRecord, Servers, NetAggIndex>>
 
 
 \* LeaderSendsMetaDataToNetAgg == ()
 
-\* Action: Leader 'i' add entry corresponding to value v to NegAgg's log
-LeaderSendsMetaDataToNetAgg(aggIndex, i, v) ==
-    /\ state[i] = Leader
-    /\ \E idx \in DOMAIN log[i]: log[i][idx].value = v \* leader has ingested the value v
-    /\ LET
-          newLogEntry == switchBuffer[v]
-          newNetAggLog == Append(log[aggIndex], newLogEntry)
-          newEntryIndex == Len(log[aggIndex]) + 1
-          newEntryKey == <<newEntryIndex, newLogEntry.term>>
-          valueAlreadyInLog == \E idx \in DOMAIN log[aggIndex] : log[aggIndex][idx].value = newLogEntry.value
+\* \* Action: Leader 'i' add entry corresponding to value v to NegAgg's log
+\* LeaderSendsMetaDataToNetAgg(aggIndex, i, v) ==
+\*     /\ state[i] = Leader
+\*     /\ \E idx \in DOMAIN log[i]: log[i][idx].value = v \* leader has ingested the value v
+\*     /\ LET
+\*           newLogEntry == switchBuffer[v]
+\*           newNetAggLog == Append(log[aggIndex], newLogEntry)
+\*           newEntryIndex == Len(log[aggIndex]) + 1
+\*           newEntryKey == <<newEntryIndex, newLogEntry.term>>
+\*           valueAlreadyInLog == \E idx \in DOMAIN log[aggIndex] : log[aggIndex][idx].value = newLogEntry.value
 
-       IN
-        /\ ~valueAlreadyInLog
-        /\ log' = [log EXCEPT ![aggIndex] = newNetAggLog]
-        /\ entryCommitStats' = entryCommitStats @@ (newEntryKey :> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ])
-        /\ unorderedRequests' = [unorderedRequests EXCEPT ![aggIndex] = @ \ {v}]
+\*        IN
+\*         /\ ~valueAlreadyInLog
+\*         /\ log' = [log EXCEPT ![aggIndex] = newNetAggLog]
+\*         /\ entryCommitStats' = entryCommitStats @@ (newEntryKey :> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ])
+\*         /\ unorderedRequests' = [unorderedRequests EXCEPT ![aggIndex] = @ \ {v}]
 
-    /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, commitIndex, leaderCount, maxc, switchBuffer, switchIndex, switchSentRecord, Servers, NetAggIndex>>
+\*     /\ UNCHANGED <<messages, serverVars, candidateVars, leaderVars, commitIndex, leaderCount, maxc, switchBuffer, switchIndex, switchSentRecord, Servers, NetAggIndex>>
 
 \* Modified. Leader i sends j an AppendEntries request containing exactly 1 entry. It was up to 1 entry.
 \* While implementations may want to send more than 1 at a time, this spec uses
@@ -234,7 +235,7 @@ LeaderSendsMetaDataToNetAgg(aggIndex, i, v) ==
 \* i is NetAggIndex
 AppendEntries(i, j) ==
     /\ i /= j
-    /\ state[j] /= Leader
+    /\ state[j] /= Leader \* only send to followers
     /\ state[i] = NetAgg
     /\ Len(log[i]) > 0  \* Only proceed if the leader has entries to send
     /\ nextIndex[i][j] <= Len(log[i])  \*  Only proceed if there are entries to send to this follower
@@ -403,7 +404,8 @@ HandleAppendEntriesResponse(i, j, m) ==
 \* in part to minimize atomic regions, and in part so that leaders of
 \* single-server clusters are able to mark entries committed.
 AdvanceCommitIndex(i, j) ==
-    /\ state[j] = Leader
+    /\ state[i] = Leader
+    /\ state[j] = NetAgg
     /\ LET \* The set of servers that agree up through index.
            Agree(index) == {i} \cup {k \in Servers :
                                          matchIndex[i][k] >= index}

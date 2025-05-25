@@ -61,9 +61,9 @@ MyNext ==
 MySwitchNext == 
   \/ \E i \in Servers, v \in Value : state[i] = Leader /\ SwitchClientRequest(switchIndex, i, v)
   \/ \E i \in Servers, v \in DOMAIN switchBuffer : SwitchClientRequestReplicate(switchIndex, i, v)
-  \/ \E i \in Servers, v \in DOMAIN switchBuffer : state[i] = Leader /\ LeaderIngestHovercRaftRequest(i, v)
-  \/ \E i \in Servers, v \in DOMAIN switchBuffer : state[i] = Leader /\ LeaderSendsMetaDataToNetAgg(NetAggIndex, i, v)
-  \/ \E i \in Servers : AdvanceCommitIndex(NetAggIndex, i)
+  \/ \E i \in Servers, v \in DOMAIN switchBuffer : state[i] = Leader /\ LeaderIngestHovercRaftRequest(NetAggIndex, i, v)
+  \* \/ \E i \in Servers, v \in DOMAIN switchBuffer : state[i] = Leader /\ LeaderSendsMetaDataToNetAgg(NetAggIndex, i, v)
+  \/ \E i \in Servers : AdvanceCommitIndex(i, NetAggIndex)
   \/ \E j \in Servers : AppendEntries(NetAggIndex, j)
 \*   \/ \E i,j \in Servers : i /= j /\ AppendEntries(i, j)
   \/ \E m \in {msg \in ValidMessage(messages) : msg.mtype \in {AppendEntriesRequest, AppendEntriesResponse}} : Receive(m)

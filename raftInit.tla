@@ -81,9 +81,9 @@ MyNewInit ==
     /\ switchSentRecord = [s \in Server |-> {}]
     /\ unorderedRequests = [s \in Server |-> {}]
     /\ votedFor = [s \in Server |-> IF s = r3 THEN Nil ELSE r3]
-    /\ voterLog = [s \in Server |-> IF s = r3 THEN (r1 :> <<>> @@ r2 :> <<>> @@ r4 :> <<>> @@ r5 :> <<>>) ELSE <<>>]
-    /\ votesGranted = [s \in Server |-> IF s = r3 THEN {r1, r2, r4, r5} ELSE {}]
-    /\ votesResponded = [s \in Server |-> IF s = r3 THEN {r1, r2, r4, r5} ELSE {}]
+    /\ voterLog = [s \in Server |-> IF s = r3 THEN (r4 :> <<>> @@ r5 :> <<>>) ELSE <<>>]
+    /\ votesGranted = [s \in Server |-> IF s = r3 THEN {r4, r5} ELSE {}]
+    /\ votesResponded = [s \in Server |-> IF s = r3 THEN {r4, r5} ELSE {}]
     /\ entryCommitStats = [ idx_term \in {} |-> [ sentCount |-> 0, ackCount |-> 0, committed |-> FALSE ] ]
 
 \* to be used directly in model Init the value
